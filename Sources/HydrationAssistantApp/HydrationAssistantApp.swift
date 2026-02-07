@@ -9,7 +9,7 @@ struct HydrationAssistantApp: App {
             MenuBarContentView(viewModel: viewModel)
         }
 
-        Settings {
+        Window("设置", id: "settings") {
             SettingsView(viewModel: viewModel)
         }
     }

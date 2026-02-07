@@ -55,4 +55,25 @@ public final class HydrationAppStore: @unchecked Sendable {
     public func snooze(minutes: Int) {
         snoozedMinutes = ReminderScheduler.snoozedIntervalMinutes(defaultMinutes: minutes)
     }
+
+    public func reconfigure(profile: UserProfile, targetMl: Int) {
+        self.profile = profile
+        self.state = DailyHydrationState(
+            targetMl: targetMl,
+            consumedMl: 0,
+            cupCapacityMl: profile.cupCapacityMl,
+            cupRemainingMl: profile.cupCapacityMl
+        )
+        self.snoozedMinutes = nil
+    }
+
+    public func startWorkday() {
+        self.state = DailyHydrationState(
+            targetMl: state.targetMl,
+            consumedMl: 0,
+            cupCapacityMl: profile.cupCapacityMl,
+            cupRemainingMl: profile.cupCapacityMl
+        )
+        self.snoozedMinutes = nil
+    }
 }

@@ -31,3 +31,26 @@ import Testing
     store.drinkOneCup()
     #expect(store.animalMood == .happy)
 }
+@Test func reconfigureProfileUpdatesTargetAndCupCapacity() {
+    let profile = UserProfile(weightKg: 60, gender: .female, age: 28, cupCapacityMl: 500)
+    let store = HydrationAppStore(profile: profile, targetMl: 2000)
+
+    let newProfile = UserProfile(weightKg: 80, gender: .male, age: 35, cupCapacityMl: 700)
+    store.reconfigure(profile: newProfile, targetMl: 2800)
+
+    #expect(store.state.targetMl == 2800)
+    #expect(store.state.cupCapacityMl == 700)
+    #expect(store.state.cupRemainingMl == 700)
+}
+
+
+@Test func startWorkdayResetsConsumedAndRefillsCup() {
+    let profile = UserProfile(weightKg: 60, gender: .female, age: 28, cupCapacityMl: 500)
+    let store = HydrationAppStore(profile: profile, targetMl: 2000)
+
+    store.drinkOneCup()
+    store.startWorkday()
+
+    #expect(store.state.consumedMl == 0)
+    #expect(store.state.cupRemainingMl == 500)
+}
