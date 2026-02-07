@@ -1,38 +1,286 @@
-# Hydration Assistant (macOS)
+# 喝水小助手（HydrationAssistant）
 
-A cute menu bar hydration helper for macOS.
+一个面向 macOS 的菜单栏喝水提醒工具，目标是帮助你在工作时段内稳定完成每日饮水目标。
 
-## M1 Features
+当前版本特性：
+- 菜单栏常驻（不占 Dock）
+- 首次设置引导 + 独立设置窗口
+- 上班/下班状态控制
+- 午休免打扰
+- 仅保留“喝水提醒”（已移除“接水提醒”）
+- 一键记录喝半杯/喝一杯
+- 显示预计下次提醒喝水时间
+- 测试通知按钮
+- 设置本地持久化（UserDefaults）
 
-- Menu bar quick actions: `半杯`, `一杯`, `已接满`, `稍后`
-- Work-hour-only reminder window
-- Lunch quiet period (no reminders)
-- Dual reminder decision:
-  - `该喝水了` (drink reminder)
-  - `该接水了` (refill reminder)
-- Weight-based daily hydration target with mild gender/age adjustment
-- Cute animal mood feedback tied to progress
+---
 
-## Run
+## 1. 产品定位
+
+这个工具主要解决一个问题：
+- 上班忙起来容易忘记喝水，直到口渴才想起。
+
+核心思路：
+- 先根据体重/年龄/性别/杯子容量估算今日目标。
+- 只在“上班且非午休”时间内提醒。
+- 下班后自动停止提醒。
+- 通过简单按钮快速记录，尽量不打断工作流。
+
+---
+
+## 2. 运行环境要求
+
+- macOS 14+
+- Apple Silicon（当前构建目标为 `arm64`）
+- Swift 6.1+
+
+说明：
+- 本项目是 Swift Package，不是 Xcode 工程模板。
+- 生产包目前为本地 ad-hoc 签名，适合本机/内部分发测试。
+
+---
+
+## 3. 快速开始
+
+### 3.1 源码运行
 
 ```bash
 swift build
 swift run HydrationAssistantApp
 ```
 
-## Test
+### 3.2 运行测试
 
 ```bash
 swift test
 ```
 
-## Current Scope
+---
 
-- Local-only data/state (no cloud sync)
-- Basic settings and reminders, focused on workday hydration completion
+## 4. 安装方式（pkg）
 
-## Next
+项目内会生成多个版本安装包，通常位于：
+- `release/<version>/HydrationAssistant-<version>.pkg`
 
-- SwiftData persistence for profile/schedule/logs
-- Daily recap view
-- More configurable reminder rules
+安装示例：
+
+```bash
+pkill -f HydrationAssistantApp || true
+sudo installer -pkg /Users/wangzhishan1/aiProject/release/0.2.6/HydrationAssistant-0.2.6.pkg -target /
+open /Applications/HydrationAssistant.app
+```
+
+如果系统拦截：
+- 到「系统设置 -> 隐私与安全性」中允许该应用。
+
+---
+
+## 5. 使用流程（建议）
+
+### 第一次使用
+
+1. 打开应用后，菜单栏会显示“首次使用设置”状态。
+2. 点击菜单中的“打开设置”或“打开设置窗口”。
+3. 在设置窗口填写：
+   - 体重（kg）
+   - 年龄（岁）
+   - 杯子容量（ml）
+   - 性别
+   - 上班/下班时间
+   - 午休开始/结束
+4. 点击“保存设置”。
+5. 菜单中会显示“保存设置成功”提示。
+
+### 日常使用
+
+1. 上班时点击“上班”。
+2. 应用开始在规则允许时段提醒喝水。
+3. 点击“喝半杯水”或“喝一杯水”记录进度。
+4. 临时不想立刻处理可点“稍后提醒”。
+5. 下班时点击“下班”，当天停止提醒。
+
+---
+
+## 6. 功能说明
+
+### 6.1 目标计算
+
+- 基础计算：按体重估算每日饮水目标。
+- 修正策略：按性别、年龄做轻量修正。
+- 边界保护：目标值有最小/最大范围限制。
+
+### 6.2 提醒策略
+
+提醒生效前提：
+- 已完成首次设置
+- 当前处于上班状态
+- 当前时间不在午休时段
+- 今日目标未达成
+
+提醒类型：
+- 仅“喝水提醒”（不再发“接水提醒”）
+
+提醒频率：
+- 基于“剩余目标 + 剩余有效时段”动态计算
+- 支持“稍后提醒”覆盖
+- 内部有最小间隔防抖，避免过度频繁
+
+### 6.3 菜单栏状态
+
+菜单栏展示：
+- 小动物状态（口渴/正常/开心）
+- 今日进度（已喝/目标）
+- 预计下次提醒喝水时间
+- 上班状态提示
+
+### 6.4 测试通知
+
+- 点击“测试提示”会主动触发一条系统通知。
+- 该功能可用于确认通知权限是否正常。
+
+### 6.5 设置持久化
+
+应用会保存以下配置：
+- 个人信息（体重、年龄、性别、杯子容量）
+- 工作时间段
+- 午休时间段
+- 稍后提醒时长
+- 是否完成首次设置
+- 是否处于上班状态
+
+### 6.6 重置设置
+
+- 点击“重置设置”会恢复默认参数。
+- 会显示“重置设置成功”提示。
+- 重置后需要重新完成首次设置。
+
+---
+
+## 7. 输入规则与校验
+
+数值字段支持直接输入：
+- 体重、年龄、杯子容量
+
+保存时会做基础校验：
+- 体重最低 30
+- 年龄最低 10
+- 杯子容量最低 100
+
+如果输入为空或非法：
+- 会保留上一次有效值，不会写入坏数据。
+
+---
+
+## 8. 项目结构
+
+```text
+.
+├── Package.swift
+├── Sources
+│   ├── HydrationAssistantApp
+│   │   ├── HydrationAssistantApp.swift      # App 入口、菜单栏和设置窗口声明
+│   │   ├── AppViewModel.swift               # 应用状态、流程控制、提醒调度
+│   │   ├── MenuBarContentView.swift         # 菜单栏 UI
+│   │   ├── SettingsView.swift               # 设置窗口 UI
+│   │   └── NotificationManager.swift        # 通知权限与发送
+│   └── HydrationAssistantDomain
+│       ├── Models.swift                     # UserProfile / WorkSchedule
+│       ├── GoalCalculator.swift             # 每日目标计算
+│       ├── ReminderScheduler.swift          # 下次提醒间隔计算
+│       ├── ScheduleEvaluator.swift          # 上班/午休时段判定
+│       ├── HydrationEngine.swift            # 饮水状态变更
+│       ├── HydrationAppStore.swift          # 领域状态管理
+│       ├── NotificationDecision.swift       # 是否发喝水提醒
+│       └── WorkdayPlanSummaryCalculator.swift
+└── Tests
+    └── HydrationAssistantDomainTests        # 领域逻辑测试
+```
+
+---
+
+## 9. 测试覆盖范围
+
+当前测试主要覆盖领域逻辑：
+- 目标饮水量计算
+- 工作时段/午休时段判断
+- 提醒间隔计算
+- 饮水状态机更新
+- 通知决策（仅喝水提醒）
+- 每日计划汇总（杯数估算）
+
+当前未做的测试：
+- UI 自动化测试
+- 端到端系统通知交互测试
+
+---
+
+## 10. 常见问题（FAQ）
+
+### Q1：点击“测试提示”没看到通知？
+可能原因：
+- 系统通知权限被拒绝。
+- 系统处于专注模式。
+- 通知样式被系统聚合。
+
+建议：
+- 到系统设置中确认应用通知已允许。
+- 临时关闭专注模式后再试。
+
+### Q2：为什么首次设置不直接在菜单里输入？
+- macOS 菜单弹层中的输入控件在部分场景会出现焦点/渲染问题。
+- 当前策略是引导到独立设置窗口输入，稳定性更高。
+
+### Q3：为什么没有“接水提醒”？
+- 已按产品决策移除，避免噪音和重复提醒。
+- 默认假设：用户杯中水喝完会自然去接。
+
+### Q4：为什么下班后不提醒？
+- 产品目标聚焦“工作时段达标”，避免下班后打扰。
+
+---
+
+## 11. 打包与发布说明（当前）
+
+当前打包流程为本地构建 + 本地签名 + pkg 封装：
+- `.app` 使用 ad-hoc 签名
+- `.pkg` 采用固定安装路径策略（避免重定位）
+
+如需对外分发（避免 Gatekeeper 拦截），建议后续补齐：
+- Developer ID 签名
+- Apple Notarization 公证
+- stapler 票据固化
+
+---
+
+## 12. Roadmap（建议）
+
+短期：
+- 首次启动自动弹出设置窗口
+- 通知权限状态可视化（显示“已授权/未授权”）
+- 提醒日志页（今日提醒次数、响应率）
+
+中期：
+- SwiftData 持久化替代部分 UserDefaults
+- 历史统计（周/月饮水趋势）
+- 可配置提醒策略模板
+
+长期：
+- 多设备同步
+- iPhone / Watch 联动
+- 更细粒度的健康建议
+
+---
+
+## 13. 开发约定
+
+- 语言：Swift + SwiftUI
+- 包管理：Swift Package Manager
+- 测试框架：Swift Testing
+- 分支策略：建议 `codex/*` 功能分支
+
+---
+
+## 14. 免责声明
+
+本项目用于日常习惯管理，不构成医疗建议。
+如有特殊健康状况，请遵循医生或专业机构建议调整饮水计划。

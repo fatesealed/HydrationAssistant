@@ -7,6 +7,28 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                GroupBox("每日目标方式") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Picker("目标方式", selection: $viewModel.targetMode) {
+                            Text("自动计算").tag(AppViewModel.TargetMode.auto)
+                            Text("手动输入").tag(AppViewModel.TargetMode.manual)
+                        }
+                        .pickerStyle(.segmented)
+
+                        if viewModel.targetMode == .manual {
+                            row(label: "每日目标 (ml)", text: $viewModel.manualTargetInput)
+                            Text("示例：2200")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("自动模式会使用体重、性别、年龄估算每日目标。")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.top, 6)
+                }
+
                 GroupBox("个人信息") {
                     VStack(spacing: 10) {
                         row(label: "体重 (kg)", text: $viewModel.weightInput)

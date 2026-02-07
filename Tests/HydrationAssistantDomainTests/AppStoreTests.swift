@@ -11,6 +11,16 @@ import Testing
     #expect(store.state.cupRemainingMl == 250)
 }
 
+@Test func halfCupActionCapsAtThreeHundredForLargeCup() {
+    let profile = UserProfile(weightKg: 60, gender: .female, age: 28, cupCapacityMl: 1000)
+    let store = HydrationAppStore(profile: profile, targetMl: 2000)
+
+    store.drinkHalfCup()
+
+    #expect(store.state.consumedMl == 300)
+    #expect(store.state.cupRemainingMl == 700)
+}
+
 @Test func refillActionResetsCupToCapacity() {
     let profile = UserProfile(weightKg: 60, gender: .female, age: 28, cupCapacityMl: 500)
     let store = HydrationAppStore(profile: profile, targetMl: 2000)
@@ -18,6 +28,16 @@ import Testing
     store.drinkOneCup()
     store.refillCup()
 
+    #expect(store.state.cupRemainingMl == 500)
+}
+
+@Test func oneCupActionCapsAtFiveHundredForLargeCup() {
+    let profile = UserProfile(weightKg: 60, gender: .female, age: 28, cupCapacityMl: 1000)
+    let store = HydrationAppStore(profile: profile, targetMl: 3000)
+
+    store.drinkOneCup()
+
+    #expect(store.state.consumedMl == 500)
     #expect(store.state.cupRemainingMl == 500)
 }
 

@@ -4,9 +4,17 @@ import SwiftUI
 
 @MainActor
 final class AppViewModel: ObservableObject {
+    enum TargetMode: String, CaseIterable {
+        case auto
+        case manual
+    }
+
     @Published private(set) var store: HydrationAppStore
     @Published var workSchedule: WorkSchedule
     @Published var snoozeMinutes: Int
+    @Published var targetMode: TargetMode
+    @Published var manualTargetMl: Int
+    @Published var manualTargetInput: String
     @Published var weightKg: Int
     @Published var age: Int
     @Published var cupCapacityMl: Int
@@ -23,6 +31,7 @@ final class AppViewModel: ObservableObject {
     @Published private(set) var isWorking: Bool
 
     private let notificationManager = NotificationManager()
+    private var notificationActionObserver: NSObjectProtocol?
     private var lastNotificationAt: Date?
     private var lastReminderKind: ReminderKind?
     private var timer: Timer?
@@ -53,6 +62,8 @@ final class AppViewModel: ObservableObject {
         static let lunchEndHour = "lunchEndHour"
         static let lunchEndMinute = "lunchEndMinute"
         static let snoozeMinutes = "snoozeMinutes"
+        static let targetMode = "targetMode"
+        static let manualTargetMl = "manualTargetMl"
         static let hasCompletedOnboarding = "hasCompletedOnboarding"
         static let isWorking = "isWorking"
     }
@@ -81,8 +92,13 @@ final class AppViewModel: ObservableObject {
         self.hasCompletedOnboarding = defaults.bool(forKey: Keys.hasCompletedOnboarding)
         self.isWorking = defaults.bool(forKey: Keys.isWorking)
         self.snoozeMinutes = defaults.integer(forKey: Keys.snoozeMinutes) > 0 ? defaults.integer(forKey: Keys.snoozeMinutes) : 15
+        let loadedTargetMode = TargetMode(rawValue: defaults.string(forKey: Keys.targetMode) ?? "") ?? .auto
+        let loadedManualTarget = defaults.integer(forKey: Keys.manualTargetMl) > 0 ? defaults.integer(forKey: Keys.manualTargetMl) : 2300
+        self.targetMode = loadedTargetMode
+        self.manualTargetMl = loadedManualTarget
+        self.manualTargetInput = String(loadedManualTarget)
 
-        let targetMl = GoalCalculator.dailyTargetMl(profile: profile)
+        let targetMl = loadedTargetMode == .manual ? loadedManualTarget : GoalCalculator.dailyTargetMl(profile: profile)
         self.store = HydrationAppStore(profile: profile, targetMl: targetMl)
         self.workSchedule = schedule
 
@@ -98,6 +114,24 @@ final class AppViewModel: ObservableObject {
         self.lunchStartTime = Self.makeTime(hour: schedule.lunchStartHour, minute: schedule.lunchStartMinute)
         self.lunchEndTime = Self.makeTime(hour: schedule.lunchEndHour, minute: schedule.lunchEndMinute)
         self.actionMessage = nil
+
+        notificationActionObserver = NotificationCenter.default.addObserver(
+            forName: NotificationManager.userActionNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self else { return }
+            guard let action = notification.userInfo?["action"] as? String else { return }
+            Task { @MainActor in
+                if action == NotificationManager.actionHalfCup {
+                    self.drinkHalfCup()
+                    self.showMessage("已记录：喝了半杯水")
+                } else if action == NotificationManager.actionOneCup {
+                    self.drinkOneCup()
+                    self.showMessage("已记录：喝了一杯水")
+                }
+            }
+        }
 
         startReminderLoop()
     }
@@ -153,18 +187,18 @@ final class AppViewModel: ObservableObject {
     }
 
     var animalText: String {
-        switch store.animalMood {
+        switch currentMood {
         case .happy:
-            return "小水獭超开心"
+            return "小水獭状态很棒，节奏超前"
         case .okay:
-            return "小水獭状态不错"
+            return "小水獭状态稳定，继续保持"
         case .thirsty:
-            return "小水獭有点口渴"
+            return "小水獭提醒你该补点水了"
         }
     }
 
     var animalSymbol: String {
-        switch store.animalMood {
+        switch currentMood {
         case .happy:
             return "face.smiling.inverse"
         case .okay:
@@ -195,8 +229,17 @@ final class AppViewModel: ObservableObject {
     }
 
     func sendTestNotification() {
-        notificationManager.requestAuthorizationIfNeeded()
-        notificationManager.sendTestNotification()
+        Task { @MainActor in
+            let result = await notificationManager.sendTestNotification()
+            switch result {
+            case .sent:
+                showMessage("测试提示已发送，请查看系统通知中心")
+            case .denied:
+                showMessage("系统通知权限未开启，请到系统设置中允许通知")
+            case .failed:
+                showMessage("测试提示发送失败，请稍后再试")
+            }
+        }
     }
 
     func startWorkday() {
@@ -221,7 +264,12 @@ final class AppViewModel: ObservableObject {
         weightKg = max(30, weightKg)
         age = max(10, age)
         cupCapacityMl = max(100, cupCapacityMl)
+        if let value = Int(manualTargetInput.trimmingCharacters(in: .whitespacesAndNewlines)), value > 0 {
+            manualTargetMl = value
+        }
+        manualTargetMl = max(1000, manualTargetMl)
         syncNumericInputs()
+        manualTargetInput = String(manualTargetMl)
 
         let profile = UserProfile(
             weightKg: weightKg,
@@ -229,7 +277,7 @@ final class AppViewModel: ObservableObject {
             age: age,
             cupCapacityMl: cupCapacityMl
         )
-        let target = GoalCalculator.dailyTargetMl(profile: profile)
+        let target = targetMode == .manual ? manualTargetMl : GoalCalculator.dailyTargetMl(profile: profile)
         store.reconfigure(profile: profile, targetMl: target)
         workSchedule = WorkSchedule(
             workStartHour: Self.hour(from: workStartTime),
@@ -269,6 +317,9 @@ final class AppViewModel: ObservableObject {
         syncNumericInputs()
         gender = Self.defaultProfile.gender
         snoozeMinutes = 15
+        targetMode = .auto
+        manualTargetMl = 2300
+        manualTargetInput = "2300"
 
         workStartTime = Self.makeTime(hour: Self.defaultSchedule.workStartHour, minute: Self.defaultSchedule.workStartMinute)
         workEndTime = Self.makeTime(hour: Self.defaultSchedule.workEndHour, minute: Self.defaultSchedule.workEndMinute)
@@ -302,6 +353,8 @@ final class AppViewModel: ObservableObject {
         defaults.set(Self.hour(from: lunchEndTime), forKey: Keys.lunchEndHour)
         defaults.set(Self.minute(from: lunchEndTime), forKey: Keys.lunchEndMinute)
         defaults.set(snoozeMinutes, forKey: Keys.snoozeMinutes)
+        defaults.set(targetMode.rawValue, forKey: Keys.targetMode)
+        defaults.set(manualTargetMl, forKey: Keys.manualTargetMl)
     }
 
     private func startReminderLoop() {
@@ -330,8 +383,9 @@ final class AppViewModel: ObservableObject {
         }
 
         if shouldNotify(now: now, reminder: reminder) {
-            notificationManager.requestAuthorizationIfNeeded()
-            notificationManager.send(reminder: reminder)
+            Task { @MainActor in
+                _ = await notificationManager.send(reminder: reminder)
+            }
             lastNotificationAt = now
             lastReminderKind = reminder
         }
@@ -362,6 +416,23 @@ final class AppViewModel: ObservableObject {
 
     private static func minute(from date: Date) -> Int {
         Calendar.current.component(.minute, from: date)
+    }
+
+    private var currentMood: AnimalMood {
+        guard hasCompletedOnboarding else { return .okay }
+        guard isWorking else { return .okay }
+
+        let now = Date()
+        let expected = expectedProgress(at: now)
+        let actual = store.progress
+
+        if actual >= min(1.0, expected + 0.15) || actual >= 0.75 {
+            return .happy
+        }
+        if actual + 0.10 >= expected {
+            return .okay
+        }
+        return .thirsty
     }
 
     private func showMessage(_ message: String) {
@@ -409,6 +480,38 @@ final class AppViewModel: ObservableObject {
             minutes -= (overlapEnd - overlapStart)
         }
         return max(0, minutes)
+    }
+
+    private func expectedProgress(at now: Date) -> Double {
+        let total = totalActiveMinutes(schedule: workSchedule)
+        guard total > 0 else { return 0 }
+        let elapsed = elapsedActiveMinutes(from: now, schedule: workSchedule)
+        return min(1.0, max(0, Double(elapsed) / Double(total)))
+    }
+
+    private func totalActiveMinutes(schedule: WorkSchedule) -> Int {
+        let workStart = schedule.workStartHour * 60 + schedule.workStartMinute
+        let workEnd = schedule.workEndHour * 60 + schedule.workEndMinute
+        let lunchStart = schedule.lunchStartHour * 60 + schedule.lunchStartMinute
+        let lunchEnd = schedule.lunchEndHour * 60 + schedule.lunchEndMinute
+        let total = max(0, workEnd - workStart)
+        let lunch = max(0, min(workEnd, lunchEnd) - max(workStart, lunchStart))
+        return max(0, total - lunch)
+    }
+
+    private func elapsedActiveMinutes(from now: Date, schedule: WorkSchedule) -> Int {
+        let current = Self.hour(from: now) * 60 + Self.minute(from: now)
+        let workStart = schedule.workStartHour * 60 + schedule.workStartMinute
+        let workEnd = schedule.workEndHour * 60 + schedule.workEndMinute
+        let lunchStart = schedule.lunchStartHour * 60 + schedule.lunchStartMinute
+        let lunchEnd = schedule.lunchEndHour * 60 + schedule.lunchEndMinute
+
+        if current <= workStart { return 0 }
+        let end = min(current, workEnd)
+        var elapsed = max(0, end - workStart)
+        let lunchOverlap = max(0, min(end, lunchEnd) - max(workStart, lunchStart))
+        elapsed -= lunchOverlap
+        return max(0, elapsed)
     }
 
     private static let timeFormatter: DateFormatter = {

@@ -34,7 +34,7 @@ struct MenuBarContentView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("首次使用设置")
                 .font(.headline)
-            Text("请在设置窗口填写体重、年龄、杯子容量、性别和时间段。")
+            Text("请在设置窗口选择目标方式：自动计算（体重/性别/年龄）或手动输入每日饮水量。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -54,12 +54,43 @@ struct MenuBarContentView: View {
 
     private var mainView: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: viewModel.animalSymbol)
-                    .font(.title2)
-                Text(viewModel.animalText)
-                    .font(.headline)
+            HStack(alignment: .center, spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(.white.opacity(0.22))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: viewModel.animalSymbol)
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("喝水提醒")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.9))
+                    Text(viewModel.animalText)
+                        .font(.system(size: 27, weight: .heavy))
+                        .minimumScaleFactor(0.78)
+                        .lineLimit(2)
+                        .foregroundStyle(.white)
+                }
+                Spacer(minLength: 0)
             }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: bannerColors,
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(.white.opacity(0.20), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.16), radius: 8, x: 0, y: 4)
 
             HStack {
                 Text(viewModel.workStatusText)
@@ -86,7 +117,50 @@ struct MenuBarContentView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            ProgressView(value: viewModel.store.progress)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("喝水进度")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(Int(viewModel.store.progress * 100))%")
+                        .font(.headline)
+                        .fontWeight(.bold)
+                }
+
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.gray.opacity(0.20))
+                            .frame(height: 16)
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 0.19, green: 0.58, blue: 0.96),
+                                        Color(red: 0.24, green: 0.75, blue: 0.52)
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(
+                                width: max(12, geo.size.width * max(0.0, min(1.0, viewModel.store.progress))),
+                                height: 16
+                            )
+                    }
+                }
+                .frame(height: 16)
+
+                Text("当前 \(viewModel.store.state.consumedMl) ml / 目标 \(viewModel.store.state.targetMl) ml")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.black.opacity(0.04))
+            )
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("喝水")
@@ -114,6 +188,16 @@ struct MenuBarContentView: View {
                     .foregroundStyle(.green)
             }
         }
+    }
+
+    private var bannerColors: [Color] {
+        if viewModel.animalText.contains("超前") {
+            return [Color(red: 0.10, green: 0.57, blue: 0.31), Color(red: 0.16, green: 0.70, blue: 0.40)]
+        }
+        if viewModel.animalText.contains("稳定") {
+            return [Color(red: 0.12, green: 0.45, blue: 0.82), Color(red: 0.19, green: 0.59, blue: 0.94)]
+        }
+        return [Color(red: 0.83, green: 0.35, blue: 0.17), Color(red: 0.95, green: 0.50, blue: 0.16)]
     }
 
 }

@@ -7,6 +7,9 @@ public enum AnimalMood: String, Sendable {
 }
 
 public final class HydrationAppStore: @unchecked Sendable {
+    private static let halfCupMaxMl = 300
+    private static let oneCupMaxMl = 500
+
     public private(set) var profile: UserProfile
     public private(set) var state: DailyHydrationState
     public private(set) var snoozedMinutes: Int?
@@ -38,13 +41,14 @@ public final class HydrationAppStore: @unchecked Sendable {
     }
 
     public func drinkHalfCup() {
-        let amount = max(1, profile.cupCapacityMl / 2)
+        let amount = min(max(1, profile.cupCapacityMl / 2), Self.halfCupMaxMl)
         HydrationEngine.recordDrink(amountMl: amount, state: &state)
         snoozedMinutes = nil
     }
 
     public func drinkOneCup() {
-        HydrationEngine.recordDrink(amountMl: profile.cupCapacityMl, state: &state)
+        let amount = min(profile.cupCapacityMl, Self.oneCupMaxMl)
+        HydrationEngine.recordDrink(amountMl: amount, state: &state)
         snoozedMinutes = nil
     }
 
