@@ -101,11 +101,20 @@ jobs:
           echo "pkg_path=$PKG" >> "$GITHUB_OUTPUT"
           echo "zip_path=$APP_ZIP" >> "$GITHUB_OUTPUT"
 
+      - name: Render release notes
+        id: notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          NOTES_PATH="$RUNNER_TEMP/release-notes.md"
+          sed "s/__VERSION__/${{ steps.vars.outputs.version }}/g" .github/release-template.md > "$NOTES_PATH"
+          echo "notes_path=$NOTES_PATH" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.vars.outputs.tag }}
-          generate_release_notes: true
+          body_path: ${{ steps.notes.outputs.notes_path }}
           files: |
             ${{ steps.package.outputs.pkg_path }}
             ${{ steps.package.outputs.zip_path }}
